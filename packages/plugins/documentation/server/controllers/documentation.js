@@ -17,14 +17,15 @@ const koaStatic = require('koa-static');
 module.exports = {
   async getInfos(ctx) {
     try {
-      const service = strapi.plugins.documentation.services.documentation;
+      const docPlugin = strapi.plugin('documentation');
+      const service = docPlugin.service('documentation');
       const docVersions = service.retrieveDocumentationVersions();
       const form = await service.retrieveFrontForm();
 
       ctx.send({
         docVersions,
         currentVersion: service.getDocumentationVersion(),
-        prefix: strapi.config.get('plugin.documentation.x-strapi-config').path,
+        prefix: strapi.plugin('documentation').config('x-strapi-config').path,
         form,
       });
     } catch (err) {

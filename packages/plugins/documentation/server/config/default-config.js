@@ -24,7 +24,7 @@ module.exports = {
   },
   servers: [
     {
-      url: 'http://localhost:1337',
+      url: 'http://localhost:1337/api',
       description: 'Development server',
     },
     {

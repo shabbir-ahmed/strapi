@@ -53,6 +53,9 @@ module.exports = {
               defer: true,
             })(ctx, next);
           },
+          config: {
+            auth: false,
+          },
         },
       ]);
     },

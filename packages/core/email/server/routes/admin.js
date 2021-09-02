@@ -16,6 +16,11 @@ module.exports = {
       path: '/test',
       handler: 'email.test',
       config: {
+        description: 'send and email test',
+        tag: {
+          plugin: 'email',
+          name: 'Email',
+        },
         policies: [
           'admin::isAuthenticatedAdmin',
           { name: 'admin::hasPermissions', options: { actions: ['plugin::email.settings.read'] } },
@@ -27,6 +32,11 @@ module.exports = {
       path: '/settings',
       handler: 'email.getSettings',
       config: {
+        description: 'get email settings',
+        tag: {
+          plugin: 'email',
+          name: 'Email',
+        },
         policies: [
           'admin::isAuthenticatedAdmin',
           { name: 'admin::hasPermissions', options: { actions: ['plugin::email.settings.read'] } },

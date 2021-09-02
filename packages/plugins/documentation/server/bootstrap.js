@@ -1,9 +1,11 @@
 /* eslint-disable no-unreachable */
 'use strict';
 
-const fs = require('fs');
 const path = require('path');
+const fs = require('fs-extra');
 const _ = require('lodash');
+const defaultConfig = require('./config/default-config');
+const { buildGetResponses } = require('./utils/builders');
 
 // Add permissions
 const RBAC_ACTIONS = [
@@ -29,10 +31,56 @@ const RBAC_ACTIONS = [
   },
 ];
 
+const createDocumentationDirectory = async apiDirPath => {
+  try {
+    await fs.ensureDir(apiDirPath);
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+const parsePathWithVariables = routePath => {
+  const pathsArray = routePath.split('/');
+  const [, rootPath] = pathsArray;
+  const parsedVariables = pathsArray
+    .filter(path => path.includes(':'))
+    .map(path => {
+      return `{${path.split(':').pop()}}`;
+    });
+
+  return `/${rootPath}/${parsedVariables.join('/')}`;
+};
+
+const buildApiEndpointJSONPath = apiName => {
+  const attributes = strapi.contentType(`api::${apiName}.${apiName}`).attributes;
+  const routes = strapi.api[apiName].routes[apiName].routes;
+
+  const paths = routes.reduce(
+    (acc, route) => {
+      if (route.method === 'GET') {
+        const routePath = route.path.includes(':')
+          ? parsePathWithVariables(route.path)
+          : route.path;
+
+        _.set(acc.paths, `${routePath}.get`, buildGetResponses(attributes, route));
+      }
+
+      return acc;
+    },
+    { paths: {} }
+  );
+
+  return paths;
+};
+
+const createFullDoc = async (fullDocJsonPath, paths) => {
+  await fs.ensureFile(fullDocJsonPath);
+  // write to full doc path
+  await fs.writeJson(fullDocJsonPath, { ...defaultConfig, paths }, { spaces: 2 });
+};
+
 module.exports = async () => {
   await strapi.admin.services.permission.actionProvider.registerMany(RBAC_ACTIONS);
-
-  return;
 
   // Check if the plugin users-permissions is installed because the documentation needs it
   if (Object.keys(strapi.plugins).indexOf('users-permissions') === -1) {
@@ -41,7 +89,11 @@ module.exports = async () => {
     );
   }
 
-  const pluginStore = strapi.store({ type: 'plugin', name: 'documentation' });
+  const pluginStore = strapi.store({
+    environment: '',
+    type: 'plugin',
+    name: 'documentation',
+  });
 
   const restrictedAccess = await pluginStore.get({ key: 'config' });
 
@@ -49,91 +101,29 @@ module.exports = async () => {
     pluginStore.set({ key: 'config', value: { restrictedAccess: false } });
   }
 
-  let shouldUpdateFullDoc = false;
-  const services = strapi.plugins['documentation'].services.documentation;
-  // Generate plugins' documentation
-  const pluginsWithDocumentationNeeded = services.getPluginsWithDocumentationNeeded();
+  const docPlugin = strapi.plugin('documentation');
+  const docPluginService = docPlugin.service('documentation');
+  const fullDocPath = docPluginService.getFullDocumentationPath();
+  const apiVersion = docPluginService.getDocumentationVersion();
 
-  pluginsWithDocumentationNeeded.forEach(plugin => {
-    const isDocExisting = services.checkIfPluginDocumentationFolderExists(plugin);
-
-    if (!isDocExisting) {
-      services.createDocumentationDirectory(services.getPluginDocumentationPath(plugin));
-      // create the overrides directory
-      services.createDocumentationDirectory(services.getPluginOverrideDocumentationPath(plugin));
-      services.createPluginDocumentationFile(plugin);
-      shouldUpdateFullDoc = true;
-    } else {
-      const needToUpdatePluginDoc = services.checkIfPluginDocNeedsUpdate(plugin);
-
-      if (needToUpdatePluginDoc) {
-        services.createPluginDocumentationFile(plugin);
-        shouldUpdateFullDoc = true;
-      }
-    }
-  });
-
-  // Retrieve all the apis from the apis directory
-  const apis = services.getApis();
-  // Generate APIS' documentation
-  apis.forEach(api => {
-    const isDocExisting = services.checkIfDocumentationFolderExists(api);
-
-    if (!isDocExisting) {
-      // If the documentation directory doesn't exist create it
-      services.createDocumentationDirectory(services.getDocumentationPath(api));
-      // Create the overrides directory
-      services.createDocumentationDirectory(services.getDocumentationOverridesPath(api));
-      // Create the documentation files per version
-      services.createDocumentationFile(api); // Then create the {api}.json documentation file
-      shouldUpdateFullDoc = true;
-    } else {
-      const needToUpdateAPIDoc = services.checkIfAPIDocNeedsUpdate(api);
-
-      if (needToUpdateAPIDoc) {
-        services.createDocumentationFile(api);
-        shouldUpdateFullDoc = true;
-      }
-    }
-  });
-
-  const fullDoc = services.generateFullDoc();
-  // Verify that the correct documentation folder exists in the documentation plugin
-  const isMergedDocumentationExists = services.checkIfMergedDocumentationFolderExists();
-  const documentationPath = services.getMergedDocumentationPath();
-
-  if (isMergedDocumentationExists) {
-    /**
-     * Retrieve all tags from the documentation and join them
-     * @param {Object} documentation
-     * @returns {String}
-     */
-    const getDocTagsToString = documentation => {
-      return _.get(documentation, 'tags', [])
-        .map(tag => {
-          return tag.name.toLowerCase();
-        })
-        .sort((a, b) => a - b)
-        .join('.');
-    };
-    const oldDoc = require(path.resolve(documentationPath, 'full_documentation.json'));
-    const oldDocTags = getDocTagsToString(oldDoc);
-    const currentDocTags = getDocTagsToString(fullDoc);
-
-    // If the tags are different (an api has been deleted) we need to rebuild the documentation
-    if (oldDocTags !== currentDocTags) {
-      shouldUpdateFullDoc = true;
-    }
-  }
-
-  if (!isMergedDocumentationExists || shouldUpdateFullDoc) {
-    // Create the folder
-    services.createDocumentationDirectory(documentationPath);
-    // Write the file
-    fs.writeFileSync(
-      path.resolve(documentationPath, 'full_documentation.json'),
-      JSON.stringify(fullDoc, null, 2),
-      'utf8'
+  let paths = {};
+  const apis = Object.keys(strapi.api);
+  for (const apiName of apis) {
+    const apiDirPath = path.join(
+      strapi.config.appPath,
+      'api',
+      apiName,
+      'documentation',
+      apiVersion
     );
+    const apiDocPath = path.join(apiDirPath, `${apiName}.json`);
+    await createDocumentationDirectory(apiName, apiDirPath);
+    const apiPathsObject = buildApiEndpointJSONPath(apiName);
+
+    await fs.writeJson(apiDocPath, apiPathsObject, { spaces: 2 });
+    paths = { ...paths, ...apiPathsObject.paths };
   }
+
+  const fullDocJsonPath = path.join(fullDocPath, apiVersion, 'full_documentation.json');
+  await createFullDoc(fullDocJsonPath, paths);
 };

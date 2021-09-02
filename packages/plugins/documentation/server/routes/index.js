@@ -17,6 +17,7 @@ module.exports = [
     path: '/v:major(\\d+).:minor(\\d+).:patch(\\d+)',
     handler: 'Documentation.index',
     config: {
+      auth: false,
       policies: [
         'plugin::documentation.index',
         { name: 'admin::hasPermissions', options: { actions: ['plugin::documentation.read'] } },
