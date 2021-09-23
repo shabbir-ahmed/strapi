@@ -4,8 +4,10 @@
 const path = require('path');
 const fs = require('fs-extra');
 const _ = require('lodash');
+const pathToRegexp = require('path-to-regexp');
+
 const defaultConfig = require('./config/default-config');
-const { buildGetResponses } = require('./utils/builders');
+const { buildApiResponses, buildApiRequests } = require('./utils/builders');
 
 // Add permissions
 const RBAC_ACTIONS = [
@@ -40,15 +42,20 @@ const createDocumentationDirectory = async apiDirPath => {
 };
 
 const parsePathWithVariables = routePath => {
-  const pathsArray = routePath.split('/');
-  const [, rootPath] = pathsArray;
-  const parsedVariables = pathsArray
-    .filter(path => path.includes(':'))
-    .map(path => {
-      return `{${path.split(':').pop()}}`;
-    });
+  console.log(routePath);
+  const parsedPath = pathToRegexp
+    .parse(routePath)
+    .map(token => {
+      if (_.isObject(token)) {
+        return token.prefix + '{' + token.name + '}';
+      }
 
-  return `/${rootPath}/${parsedVariables.join('/')}`;
+      return token;
+    })
+    .join('');
+
+  console.log(parsedPath);
+  return parsedPath;
 };
 
 const buildApiEndpointJSONPath = apiName => {
@@ -61,8 +68,20 @@ const buildApiEndpointJSONPath = apiName => {
         const routePath = route.path.includes(':')
           ? parsePathWithVariables(route.path)
           : route.path;
+        _.set(acc.paths, `${routePath}.get`, buildApiResponses(attributes, route));
+        _.set(acc.paths, `${routePath}.get.tags`, [_.upperFirst(route.info.apiName)]);
+      }
 
-        _.set(acc.paths, `${routePath}.get`, buildGetResponses(attributes, route));
+      if (route.method === 'POST') {
+        const routePath = route.path.includes(':')
+          ? parsePathWithVariables(route.path)
+          : route.path;
+
+        const { responses } = buildApiResponses(attributes, route);
+        const { requestBody } = buildApiRequests(attributes, route);
+        _.set(acc.paths, `${routePath}.post.responses`, responses);
+        _.set(acc.paths, `${routePath}.post.requestBody`, requestBody);
+        _.set(acc.paths, `${routePath}.post.tags`, [_.upperFirst(route.info.apiName)]);
       }
 
       return acc;

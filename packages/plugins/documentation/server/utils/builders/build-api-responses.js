@@ -1,11 +1,9 @@
 'use strict';
 
-const _ = require('lodash');
-
 module.exports = (attributes, route) => {
-  // FIXME: this isn't reliable since a handler doesn't have to be called findOne
   let data;
   let meta;
+  // FIXME: this isn't reliable since a handler doesn't have to be called findOne
   if (route.handler.includes('findOne')) {
     data = {
       type: 'object',
@@ -49,6 +47,5 @@ module.exports = (attributes, route) => {
         },
       },
     },
-    tags: [_.upperFirst(route.info.apiName)],
   };
 };

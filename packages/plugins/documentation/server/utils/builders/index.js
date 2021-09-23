@@ -1,7 +1,9 @@
 'use strict';
 
-const buildGetResponses = require('./build-get-responses');
+const buildApiResponses = require('./build-api-responses');
+const buildApiRequests = require('./build-api-requests');
 
 module.exports = {
-  buildGetResponses,
+  buildApiResponses,
+  buildApiRequests,
 };
