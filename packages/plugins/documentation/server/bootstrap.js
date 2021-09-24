@@ -8,6 +8,7 @@ const pathToRegexp = require('path-to-regexp');
 
 const defaultConfig = require('./config/default-config');
 const { buildApiResponses, buildApiRequests } = require('./utils/builders');
+const queryParams = require('./utils/query-params');
 
 // Add permissions
 const RBAC_ACTIONS = [
@@ -51,16 +52,38 @@ const parsePathWithVariables = routePath => {
 const buildApiEndpointJSONPath = apiName => {
   const attributes = strapi.contentType(`api::${apiName}.${apiName}`).attributes;
   const routes = strapi.api[apiName].routes[apiName].routes;
-
   const paths = routes.reduce(
     (acc, route) => {
+      const hasPathParams = route.path.includes('/:');
+
       if (route.method === 'GET') {
         const routePath = route.path.includes(':')
           ? parsePathWithVariables(route.path)
           : route.path;
-        const { responses } = buildApiResponses(attributes, route);
+
+        const { responses } = buildApiResponses(attributes, route, hasPathParams);
         _.set(acc.paths, `${routePath}.get.responses`, responses);
         _.set(acc.paths, `${routePath}.get.tags`, [_.upperFirst(route.info.apiName)]);
+
+        if (hasPathParams) {
+          const pathParams = pathToRegexp
+            .parse(route.path)
+            .filter(token => _.isObject(token))
+            .map(param => {
+              return {
+                name: param.name,
+                in: 'path',
+                description: '',
+                deprecated: false,
+                required: true,
+                schema: { type: 'string' },
+              };
+            });
+
+          _.set(acc.paths, `${routePath}.get.parameters`, pathParams);
+        } else {
+          _.set(acc.paths, `${routePath}.get.parameters`, queryParams);
+        }
       }
 
       if (route.method === 'POST') {
@@ -68,7 +91,7 @@ const buildApiEndpointJSONPath = apiName => {
           ? parsePathWithVariables(route.path)
           : route.path;
 
-        const { responses } = buildApiResponses(attributes, route);
+        const { responses } = buildApiResponses(attributes, route, hasPathParams);
         const { requestBody } = buildApiRequests(attributes, route);
         _.set(acc.paths, `${routePath}.post.responses`, responses);
         _.set(acc.paths, `${routePath}.post.requestBody`, requestBody);
@@ -80,7 +103,7 @@ const buildApiEndpointJSONPath = apiName => {
           ? parsePathWithVariables(route.path)
           : route.path;
 
-        const { responses } = buildApiResponses(attributes, route);
+        const { responses } = buildApiResponses(attributes, route, hasPathParams);
         const { requestBody } = buildApiRequests(attributes, route);
         _.set(acc.paths, `${routePath}.put.responses`, responses);
         _.set(acc.paths, `${routePath}.put.requestBody`, requestBody);
@@ -91,7 +114,7 @@ const buildApiEndpointJSONPath = apiName => {
         const routePath = route.path.includes(':')
           ? parsePathWithVariables(route.path)
           : route.path;
-        const { responses } = buildApiResponses(attributes, route);
+        const { responses } = buildApiResponses(attributes, route, hasPathParams);
         _.set(acc.paths, `${routePath}.delete.responses`, responses);
         _.set(acc.paths, `${routePath}.delete.tags`, [_.upperFirst(route.info.apiName)]);
       }

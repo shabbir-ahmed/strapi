@@ -1,44 +1,50 @@
 'use strict';
 
-const getData = (actionType, attributes) => {
-  if (actionType === 'find') {
+const getData = (hasParams, attributes) => {
+  // const requiredAttributes = Object.keys(attributes).filter(key => attributes[key].required);
+
+  if (hasParams) {
     return {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: { attributes: { properties: attributes } },
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        attributes: { type: 'object', properties: attributes },
       },
     };
   }
 
   return {
-    type: 'object',
-    properties: { attributes: { properties: attributes } },
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        attributes: { type: 'object', properties: attributes },
+      },
+    },
   };
 };
 
-const getMeta = actionType => {
-  if (actionType === 'find') {
-    return {
-      properties: {
-        pagination: {
-          properties: {
-            page: { type: 'integer' },
-            pageSize: { type: 'integer', minimum: 25 },
-            pageCount: { type: 'integer', maximum: 1 },
-            total: { type: 'integer' },
-          },
-        },
-      },
-    };
+const getMeta = hasParams => {
+  if (hasParams) {
+    return { type: 'object' };
   }
 
-  return { type: 'object' };
+  return {
+    properties: {
+      pagination: {
+        properties: {
+          page: { type: 'integer' },
+          pageSize: { type: 'integer', minimum: 25 },
+          pageCount: { type: 'integer', maximum: 1 },
+          total: { type: 'integer' },
+        },
+      },
+    },
+  };
 };
 
-module.exports = (attributes, route) => {
-  const actionType = route.split('.').pop();
-
+module.exports = (attributes, route, hasParams = false) => {
   let schema;
   if (route.method === 'DELETE') {
     schema = {
@@ -48,8 +54,8 @@ module.exports = (attributes, route) => {
   } else {
     schema = {
       properties: {
-        data: getData(actionType, attributes),
-        meta: getMeta(actionType),
+        data: getData(hasParams, attributes),
+        meta: getMeta(hasParams),
       },
     };
   }
