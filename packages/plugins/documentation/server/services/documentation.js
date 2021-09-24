@@ -13,7 +13,13 @@ module.exports = () => {
     },
 
     getFullDocumentationPath() {
-      return path.join(strapi.config.appPath, 'extensions', 'documentation', 'documentation');
+      return path.join(
+        strapi.config.appPath,
+        'src',
+        'extensions',
+        'documentation',
+        'documentation'
+      );
     },
 
     retrieveDocumentationVersions() {

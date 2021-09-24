@@ -46,6 +46,7 @@ module.exports = {
           : strapi.plugins.documentation.config.info.version;
       const openAPISpecsPath = path.join(
         strapi.config.appPath,
+        'src',
         'extensions',
         'documentation',
         'documentation',
@@ -67,6 +68,7 @@ module.exports = {
         try {
           const layoutPath = path.resolve(
             strapi.config.appPath,
+            'src',
             'extensions',
             'documentation',
             'public',
@@ -81,6 +83,7 @@ module.exports = {
           try {
             const staticFolder = path.resolve(
               strapi.config.appPath,
+              'src',
               'extensions',
               'documentation',
               'public'
@@ -120,6 +123,7 @@ module.exports = {
       try {
         const layoutPath = path.resolve(
           strapi.config.appPath,
+          'src',
           'extensions',
           'documentation',
           'public',
@@ -133,6 +137,7 @@ module.exports = {
         try {
           const staticFolder = path.resolve(
             strapi.config.appPath,
+            'src',
             'extensions',
             'documentation',
             'public'

@@ -1,5 +1,5 @@
 'use strict';
-module.exports = attributes => {
+module.exports = (attributes, route) => {
   const requiredAttributes = Object.entries(attributes)
     .filter(([, val]) => {
       return val.required;
@@ -8,9 +8,10 @@ module.exports = attributes => {
       return { [attr]: val };
     });
 
-  const requestAttributes = requiredAttributes.length
-    ? Object.assign({}, ...requiredAttributes)
-    : attributes;
+  const requestAttributes =
+    route.method === 'POST' && requiredAttributes.length
+      ? Object.assign({}, ...requiredAttributes)
+      : attributes;
 
   return {
     requestBody: {

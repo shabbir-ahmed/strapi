@@ -33,16 +33,7 @@ const RBAC_ACTIONS = [
   },
 ];
 
-const createDocumentationDirectory = async apiDirPath => {
-  try {
-    await fs.ensureDir(apiDirPath);
-  } catch (error) {
-    console.error(error);
-  }
-};
-
 const parsePathWithVariables = routePath => {
-  console.log(routePath);
   const parsedPath = pathToRegexp
     .parse(routePath)
     .map(token => {
@@ -54,7 +45,6 @@ const parsePathWithVariables = routePath => {
     })
     .join('');
 
-  console.log(parsedPath);
   return parsedPath;
 };
 
@@ -68,7 +58,8 @@ const buildApiEndpointJSONPath = apiName => {
         const routePath = route.path.includes(':')
           ? parsePathWithVariables(route.path)
           : route.path;
-        _.set(acc.paths, `${routePath}.get`, buildApiResponses(attributes, route));
+        const { responses } = buildApiResponses(attributes, route);
+        _.set(acc.paths, `${routePath}.get.responses`, responses);
         _.set(acc.paths, `${routePath}.get.tags`, [_.upperFirst(route.info.apiName)]);
       }
 
@@ -82,6 +73,27 @@ const buildApiEndpointJSONPath = apiName => {
         _.set(acc.paths, `${routePath}.post.responses`, responses);
         _.set(acc.paths, `${routePath}.post.requestBody`, requestBody);
         _.set(acc.paths, `${routePath}.post.tags`, [_.upperFirst(route.info.apiName)]);
+      }
+
+      if (route.method === 'PUT') {
+        const routePath = route.path.includes(':')
+          ? parsePathWithVariables(route.path)
+          : route.path;
+
+        const { responses } = buildApiResponses(attributes, route);
+        const { requestBody } = buildApiRequests(attributes, route);
+        _.set(acc.paths, `${routePath}.put.responses`, responses);
+        _.set(acc.paths, `${routePath}.put.requestBody`, requestBody);
+        _.set(acc.paths, `${routePath}.put.tags`, [_.upperFirst(route.info.apiName)]);
+      }
+
+      if (route.method === 'DELETE') {
+        const routePath = route.path.includes(':')
+          ? parsePathWithVariables(route.path)
+          : route.path;
+        const { responses } = buildApiResponses(attributes, route);
+        _.set(acc.paths, `${routePath}.delete.responses`, responses);
+        _.set(acc.paths, `${routePath}.delete.tags`, [_.upperFirst(route.info.apiName)]);
       }
 
       return acc;
@@ -130,13 +142,14 @@ module.exports = async () => {
   for (const apiName of apis) {
     const apiDirPath = path.join(
       strapi.config.appPath,
+      'src',
       'api',
       apiName,
       'documentation',
       apiVersion
     );
     const apiDocPath = path.join(apiDirPath, `${apiName}.json`);
-    await createDocumentationDirectory(apiName, apiDirPath);
+    await fs.ensureFile(apiDocPath);
     const apiPathsObject = buildApiEndpointJSONPath(apiName);
 
     await fs.writeJson(apiDocPath, apiPathsObject, { spaces: 2 });
